@@ -1,157 +1,97 @@
 const graphql = require("graphql");
+const PostModel = require("./mongoose/PostModel");
+const UserModel = require("./mongoose/UserModel");
 
-const {
-  GraphQLObjectType,
-  GraphQLSchema,
-  GraphQLList,
-  GraphQLID,
-  GraphQLString,
-} = graphql;
-
-const findUserById = (source, args, parent) => {
-  for (let i = 0; i <= source.length; i++) {
-    if (args.id == source[i].id) {
-      return source[i];
-    }
-  }
-};
-
-const findUserByAuthorId = (source, args, parent) => {
-  for (let i = 0; i <= source.length; i++) {
-    if (parent.authorid == source[i].id) {
-      return source[i];
-    }
-  }
-};
-
-// sample data
-const users = [
-  {
-    id: 1,
-    name: "joe grand",
-    genre: "sci-fi",
-  },
-  {
-    id: 2,
-    name: "micheal michez",
-    genre: "action",
-  },
-  {
-    id: 3,
-    name: "mark zuck",
-    genre: "tech",
-  },
-  {
-    id: 4,
-    name: "brad trav",
-    genre: "tech",
-  },
-];
-
-const posts = [
-  {
-    id: 15,
-    caption: "i am at the planet",
-    authorid: "1",
-  },
-  {
-    id: 156,
-    caption: "i can swim",
-    authorid: "1",
-  },
-  {
-    id: 21,
-    caption: "there is a place in  my heart",
-    authorid: "2",
-  },
-  {
-    id: 42,
-    caption: "i can swim",
-    authorid: "3",
-  },
-  {
-    id: 46,
-    caption: "brad trav",
-    authorid: "4",
-  },
-];
-
-// Post Type
-const PostType = new GraphQLObjectType({
-  name: "Post",
-  fields: () => ({
-    id: { type: GraphQLID },
-    caption: { type: GraphQLString },
-    authorid: { type: GraphQLString },
-    user: {
-      type: UserType,
-      resolve(parent, args) {
-        return findUserByAuthorId(users, args, parent);
-      },
-    },
-  }),
-});
-
-// User  Type
-const UserType = new GraphQLObjectType({
+const UserType = new graphql.GraphQLObjectType({
   name: "User",
   fields: () => ({
-    id: { type: GraphQLID },
-    name: { type: GraphQLString },
-    genre: { type: GraphQLString },
+    id: { type: graphql.GraphQLNonNull(graphql.GraphQLID) },
+    name: { type: graphql.GraphQLNonNull(graphql.GraphQLString) },
     post: {
       type: PostType,
       resolve(parent, args) {
-        for (let i = 0; i <= posts.length; i++) {
-          if (parent.id == posts[i].authorid) {
-            return posts[i];
-          }
-        }
-      },
-    },
-    posts: {
-      type: new GraphQLList(PostType),
-      resolve(parent, args) {
-        return posts.filter((post) => post.authorid == parent.id);
+        return PostModel.find({ userid: parent.id });
       },
     },
   }),
 });
 
-// Main Query
-const RootQuery = new GraphQLObjectType({
-  name: "RootQueryType",
+const PostType = new graphql.GraphQLObjectType({
+  name: "Post",
+  fields: () => ({
+    id: { type: graphql.GraphQLNonNull(graphql.GraphQLID) },
+    caption: { type: graphql.GraphQLNonNull(graphql.GraphQLString) },
+    userid: { type: graphql.GraphQLNonNull(graphql.GraphQLID) },
+  }),
+});
+
+const RootQueryType = new graphql.GraphQLObjectType({
+  name: "RootQuery",
   fields: {
     user: {
       type: UserType,
-      args: { id: { type: GraphQLID } },
+      args: { id: { type: graphql.GraphQLNonNull(graphql.GraphQLID) } },
       resolve(parent, args) {
-        return findUserById(users, args, parent);
+        return UserModel.findById(args.id);
       },
     },
     users: {
-      type: new GraphQLList(UserType),
+      type: new graphql.GraphQLList(UserType),
       resolve(parent, args) {
-        return users;
+        return UserModel.find({});
       },
     },
     post: {
       type: PostType,
-      args: { id: { type: GraphQLID } },
+      args: { id: { type: graphql.GraphQLNonNull(graphql.GraphQLID) } },
       resolve(parent, args) {
-        //code goes here
-        return findUserById(posts, args, parent);
+        return PostModel.findById(args.id);
       },
     },
     posts: {
-      type: new GraphQLList(PostType),
+      type: new graphql.GraphQLList(PostType),
       resolve(parent, args) {
-        return posts;
+        return PostModel.find({});
       },
     },
   },
 });
 
-module.exports = new GraphQLSchema({
-  query: RootQuery,
+const Mutation = new graphql.GraphQLObjectType({
+  name: "mutation",
+  fields: {
+    addUser: {
+      type: UserType,
+      args: {
+        name: { type: graphql.GraphQLNonNull(graphql.GraphQLString) },
+      },
+      resolve(parent, args) {
+        const user = new UserModel({
+          name: args.name,
+        });
+
+        return user.save();
+      },
+    },
+    addPost: {
+      type: PostType,
+      args: {
+        caption: { type: graphql.GraphQLNonNull(graphql.GraphQLString) },
+        userid: { type: graphql.GraphQLNonNull(graphql.GraphQLString) },
+      },
+      resolve(parent, args) {
+        const post = new PostModel({
+          caption: args.caption,
+          userid: args.userid,
+        });
+
+        return post.save();
+      },
+    },
+  },
+});
+
+module.exports = new graphql.GraphQLSchema({
+  query: RootQueryType,
+  mutation: Mutation,
 });
